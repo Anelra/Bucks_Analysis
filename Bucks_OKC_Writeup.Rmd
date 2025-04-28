@@ -1,0 +1,174 @@
+---
+title: "Bucks_OKC_Writeup"
+author: "Ari Cross"
+date: "2025-04-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(ggforce)
+library(dplyr)
+```
+
+```{r import data, include=FALSE}
+library(readr)
+shots <- read_csv("data_mil_okc_121724_shots(in).csv")
+
+str(shots)
+```
+
+Shot Quality vs. Shot Success
+```{r}
+shots %>%
+  group_by(team_nba_off) %>%
+  summarise(avg_qSQ = mean(qSQ, na.rm = TRUE),
+            actual_fg_pct = mean(fg, na.rm = TRUE)) %>%
+  arrange(desc(avg_qSQ))
+```
+
+Catch-and-shoot Effectiveness
+```{r}
+shots %>%
+  group_by(catchAndShoot) %>%
+  summarise(fg_pct = mean(fg, na.rm = TRUE),
+            avg_qSQ = mean(qSQ, na.rm = TRUE),
+            attempts = n())
+```
+
+Defensive Contest
+```{r}
+shots %>%
+  group_by(contestLevel) %>%
+  summarise(fg_pct = mean(fg, na.rm = TRUE),
+            avg_qSQ = mean(qSQ, na.rm = TRUE),
+            attempts = n()) %>%
+  arrange(fg_pct)
+
+```
+
+Speed and Success
+```{r}
+shots %>%
+  mutate(speed_bin = cut(shooterSpeed, breaks = c(0, 1, 3, 6, 10, Inf), 
+                         labels = c("Slow", "Moderate", "Fast", "Very Fast", "Insane"))) %>%
+  group_by(speed_bin) %>%
+  summarise(fg_pct = mean(fg, na.rm = TRUE),
+            avg_qSQ = mean(qSQ, na.rm = TRUE),
+            attempts = n())
+```
+
+Court Region and Shot Type
+```{r}
+shots%>%
+  group_by(team_nba_off, region) %>%
+  summarise(fg_pct = mean(fg, na.rm = TRUE),
+            attempts = n()) %>%
+  arrange(desc(fg_pct))
+```
+
+Plots
+```{r}
+ggplot(shots, aes(x = loc_x, y = loc_y, color = factor(fg))) +
+  geom_point(alpha = 0.7, size = 2) +
+  coord_fixed() +
+  facet_wrap(~team_nba_off) +
+  scale_color_manual(values = c("0" = "red", "1" = "green"), labels = c("Miss", "Make")) +
+  labs(title = "Shot Chart by Team", x = "Court X", y = "Court Y", color = "Shot Result") +
+  theme_minimal()
+```
+
+Function for the court
+```{r}
+draw_half_court <- function() {
+  court_theme <- theme_minimal() +
+    theme(
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank()
+    )
+  
+  court <- ggplot() +
+    # Court elements
+    geom_circle(aes(x0 = 0, y0 = 0, r = 7.5), color = "gray") +   # Rim area
+    geom_rect(aes(xmin = -8, xmax = 8, ymin = 0, ymax = 19), fill = NA, color = "gray") + # Paint
+    geom_rect(aes(xmin = -25, xmax = 25, ymin = -5, ymax = 47), fill = NA, color = "black") + # Court border
+    geom_circle(aes(x0 = 0, y0 = 19, r = 6), color = "gray") + # Free throw
+    geom_segment(aes(x = -22, y = 0, xend = -22, yend = 14), color = "gray") + # 3pt line
+    geom_segment(aes(x = 22, y = 0, xend = 22, yend = 14), color = "gray") +
+    geom_curve(aes(x = -22, y = 14, xend = 22, yend = 14),
+               curvature = -1, color = "gray") +
+    coord_fixed() +
+    court_theme
+  return(court)
+}
+
+draw_half_court_layers <- function() {
+  list(
+    geom_circle(aes(x0 = 0, y0 = 0, r = 7.5), inherit.aes = FALSE, color = "gray"),   # Rim
+    geom_rect(aes(xmin = -8, xmax = 8, ymin = 0, ymax = 19), inherit.aes = FALSE, fill = NA, color = "gray"),  # Paint
+    geom_rect(aes(xmin = -25, xmax = 25, ymin = -5, ymax = 47), inherit.aes = FALSE, fill = NA, color = "black"),  # Border
+    geom_circle(aes(x0 = 0, y0 = 19, r = 6), inherit.aes = FALSE, color = "gray"),  # Free throw
+    geom_segment(aes(x = -22, y = 0, xend = -22, yend = 14), inherit.aes = FALSE, color = "gray"),  # 3pt sides
+    geom_segment(aes(x = 22, y = 0, xend = 22, yend = 14), inherit.aes = FALSE, color = "gray"),
+    geom_curve(aes(x = -22, y = 14, xend = 22, yend = 14), inherit.aes = FALSE, curvature = -1, color = "gray"),  # 3pt arc
+    coord_fixed(),
+    theme_minimal() +
+      theme(
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()
+      )
+  )
+}
+```
+Insert Data
+```{r}
+draw_half_court() +
+  geom_point(data = shots, aes(x = loc_x, y = loc_y, color = factor(fg)),
+             size = 2, alpha = 0.7) +
+  scale_color_manual(values = c("0" = "red", "1" = "green")) +
+  labs(title = "Shot Map with Court Overlay", color = "Shot Made")
+
+```
+```{r}
+ggplot(shots, aes(x = loc_x, y = loc_y)) +
+  geom_point(aes(color = factor(fg)), size = 2, alpha = 0.7) +
+  scale_color_manual(values = c("0" = "red", "1" = "green")) +
+  labs(title = "Shot Map with Court Overlay", color = "Shot Made") +
+  draw_half_court_layers()
+
+```
+
+Heat Map
+```{r}
+shots %>%
+  filter(team_nba_off %in% c("MIL", "OKC")) %>%
+  ggplot(aes(x = loc_x, y = loc_y)) +
+  geom_density_2d_filled(alpha = 0.6) +
+  facet_wrap(~team_nba_off) +
+  draw_half_court_layers() +
+  labs(title = "Shot Density: Bucks vs. OKC") +
+  theme_minimal()
+```
+
+```{r}
+shots %>%
+  filter(player_nba_shooter == "Gilgeous-Alexander, Shai") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = mean(fg),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    contested_pct = mean(contestLevel == "heavily_contested")
+  )
+```
+
