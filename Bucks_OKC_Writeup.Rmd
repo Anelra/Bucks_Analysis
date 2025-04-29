@@ -1,5 +1,5 @@
 ---
-title: "Bucks_OKC_Writeup"
+title: "NBA Cup Write Up"
 author: "Ari Cross"
 date: "2025-04-28"
 output: html_document
@@ -7,8 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
-
+![Bucks v OKC NBA Cup Analyses](pics/NBA_cup.jpg)
 ```{r libraries, include=FALSE}
 library(tidyverse)
 library(ggplot2)
@@ -16,7 +17,7 @@ library(scales)
 library(ggforce)
 library(dplyr)
 ```
-
+The NBA cup this past year was played against a team who, in regular season, had the highest offensive rating in the NBA (compared to our no.11). What changed within the NBA cup that caused our success?
 ```{r import data, include=FALSE}
 library(readr)
 shots <- read_csv("data_mil_okc_121724_shots(in).csv")
@@ -25,7 +26,7 @@ str(shots)
 ```
 
 Shot Quality vs. Shot Success
-```{r}
+```{r, echo=FALSE}
 shots %>%
   group_by(team_nba_off) %>%
   summarise(avg_qSQ = mean(qSQ, na.rm = TRUE),
@@ -33,8 +34,10 @@ shots %>%
   arrange(desc(avg_qSQ))
 ```
 
+Though we had nearly identical shot quality, the gap in actual field goal percentage says one of two things: exceptional Bucks defense or cold shooting from OKC.
+
 Catch-and-shoot Effectiveness
-```{r}
+```{r, echo=FALSE}
 shots %>%
   group_by(catchAndShoot) %>%
   summarise(fg_pct = mean(fg, na.rm = TRUE),
@@ -43,7 +46,7 @@ shots %>%
 ```
 
 Defensive Contest
-```{r}
+```{r, echo=FALSE}
 shots %>%
   group_by(contestLevel) %>%
   summarise(fg_pct = mean(fg, na.rm = TRUE),
@@ -53,8 +56,10 @@ shots %>%
 
 ```
 
+The fact that heavily contested shots still had some conversion (34.6%) shows how OKC still got decent chances—but our contesting suppressed quality (avg qSQ only 44.0).
+
 Speed and Success
-```{r}
+```{r, echo=FALSE}
 shots %>%
   mutate(speed_bin = cut(shooterSpeed, breaks = c(0, 1, 3, 6, 10, Inf), 
                          labels = c("Slow", "Moderate", "Fast", "Very Fast", "Insane"))) %>%
@@ -64,8 +69,10 @@ shots %>%
             attempts = n())
 ```
 
+This suggests we succeeded on fast breaks or quick decisions, while OKC’s slower setups didn’t yield returns, even when shot quality was good. (i.e. the classic Shai mid-range pull up's only converting at 30% compared to his season's 50%)
+
 Court Region and Shot Type
-```{r}
+```{r, echo=FALSE}
 shots%>%
   group_by(team_nba_off, region) %>%
   summarise(fg_pct = mean(fg, na.rm = TRUE),
@@ -73,8 +80,15 @@ shots%>%
   arrange(desc(fg_pct))
 ```
 
+We were extremely effective from high-value zones, (e.i., Left wing three, Right corner three ,Restricted area (RA)
+
+In contrast, OKC underperformed in their strongholds:RA: 40%, Key: 45.8%, Middle two: 50% on just 6 shots
+
+This means we didn’t just shoot better, we shot better from smarter, higher value areas.
+
+
 Plots
-```{r}
+```{r, echo=FALSE, include=FALSE}
 ggplot(shots, aes(x = loc_x, y = loc_y, color = factor(fg))) +
   geom_point(alpha = 0.7, size = 2) +
   coord_fixed() +
@@ -84,8 +98,8 @@ ggplot(shots, aes(x = loc_x, y = loc_y, color = factor(fg))) +
   theme_minimal()
 ```
 
-Function for the court
-```{r}
+
+```{r function for the court, echo=FALSE}
 draw_half_court <- function() {
   court_theme <- theme_minimal() +
     theme(
@@ -130,8 +144,8 @@ draw_half_court_layers <- function() {
   )
 }
 ```
-Insert Data
-```{r}
+
+```{r, echo=FALSE, include=FALSE}
 draw_half_court() +
   geom_point(data = shots, aes(x = loc_x, y = loc_y, color = factor(fg)),
              size = 2, alpha = 0.7) +
@@ -139,17 +153,28 @@ draw_half_court() +
   labs(title = "Shot Map with Court Overlay", color = "Shot Made")
 
 ```
-```{r}
-ggplot(shots, aes(x = loc_x, y = loc_y)) +
+```{r, echo=FALSE}
+shots %>% 
+  filter(team_nba_off %in% c("MIL")) %>%
+  ggplot(aes(x = loc_x, y = loc_y)) +
   geom_point(aes(color = factor(fg)), size = 2, alpha = 0.7) +
   scale_color_manual(values = c("0" = "red", "1" = "green")) +
-  labs(title = "Shot Map with Court Overlay", color = "Shot Made") +
+  labs(title = "Bucks Shots", color = "Shot Made") +
   draw_half_court_layers()
 
 ```
+```{r, echo=FALSE}
+shots %>% 
+  filter(team_nba_off %in% c("OKC")) %>%
+  ggplot(aes(x = loc_x, y = loc_y)) +
+  geom_point(aes(color = factor(fg)), size = 2, alpha = 0.7) +
+  scale_color_manual(values = c("0" = "red", "1" = "green")) +
+  labs(title = "OKC Shots", color = "Shot Made") +
+  draw_half_court_layers()
+```
 
 Heat Map
-```{r}
+```{r, echo=FALSE}
 shots %>%
   filter(team_nba_off %in% c("MIL", "OKC")) %>%
   ggplot(aes(x = loc_x, y = loc_y)) +
@@ -160,7 +185,25 @@ shots %>%
   theme_minimal()
 ```
 
-```{r}
+From the heat map and bar chart, we can draw that OKC had greater diversity in their shot selection; many more types of shots fell for them. However, we had noticeably higher catch and shoot makes and catch and shoot makes with a relocation, indicating that OKC has trouble defending a player when moving to a different spot to shoot from.
+
+```{r, echo=FALSE}
+shots %>% 
+  filter(team_nba_off %in% c("MIL", "OKC")) %>%
+  ggplot(aes(x = complexShotType, fill = team_nba_off))+
+  geom_bar( position = 'dodge')+
+  scale_fill_manual(values=c("green", "blue"))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r, include=FALSE}
+# shots %>% 
+#   filter(team_nba_off %in% c("OKC")) %>%
+#   ggplot(aes(x = complexShotType))+
+#   geom_bar()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r, echo=FALSE}
 shots %>%
   filter(player_nba_shooter == "Gilgeous-Alexander, Shai") %>%
   summarise(
@@ -172,3 +215,7 @@ shots %>%
   )
 ```
 
+Conclusions 
+
+We seemed to have optimized our help-defense and closeout structure:
+Maintaining high contest frequency without sacrificing defensive integrity. This implies a high-IQ rotation scheme and strong communication.
