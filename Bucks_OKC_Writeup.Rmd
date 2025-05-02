@@ -1,8 +1,10 @@
 ---
-title: "NBA Cup Analysis"
+title: "NBA Cup Final Game Report: Milwaukee Bucks vs Oklahoma City Thunder"
 author: "Ari Cross"
 date: "2025-04-28"
-output: html_document
+bookdown::html_document2:
+    number_sections: true
+    fig_caption: true
 ---
 
 ```{r setup, include=FALSE}
@@ -26,6 +28,10 @@ library(lme4)
 library(kableExtra)
 library(broom)
 library(pander)
+library(htmltools)
+library(bookdown)
+library(ggrepel)
+library(patchwork)
 ```
 
 ```{r functions, echo=FALSE}
@@ -74,9 +80,11 @@ draw_half_court_layers <- function() {
 }
 ```
 
+## Overview
+
 The NBA Cup is a recent addition to regular season play with a tournament debut in 2023. All NBA Cup games contribute to regular season records except the championship game.
 
-The Bucks' 2024 NBA Cup championship game was played against a team who, in regular season, had the highest offensive and defensive rating in the NBA (compared to our no.11). OKC is a statistically sound team with superstars and MVP nominees like Shai Gilgeous-Alexander accompanied by a deep roster of heavy contributors. During there first match-up of the year, without doubt, the OKC Thunder were expected to walk away with this trophy. What circumstances fostered the Bucks' success in the NBA Cup finals?
+The Bucks' 2024 NBA Cup championship game was played against a team who, in regular season, had the highest offensive and defensive rating in the NBA (compared to our no.11). OKC is a statistically sound team with superstars and MVP nominees like Shai Gilgeous-Alexander accompanied by a deep roster of heavy contributors. During there first match-up of the year, without doubt, the OKC Thunder were expected to walk away with a trophy. What circumstances fostered the Bucks' success in the NBA Cup finals?
 
 ```{r import data, include=FALSE}
 shots <- read_csv("data_mil_okc_121724_shots(in).csv")
@@ -86,10 +94,11 @@ str(shots)
 str(team_min)
 ```
 
-### League-Wide Norms
+## League-Wide Norms
 
 ```{r, echo=FALSE}
-ggplot(shots, aes(x = contestLevel, y = qSQ)) +
+ggplot(shots, aes(x = factor(contestLevel, levels = c("uncontested", "lightly_contested", "heavily_contested")), 
+                  y = qSQ)) +
   geom_jitter(width = 0.2, height = 0) +
   geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "red") +
   labs(title = "Scatterplot of qSQ vs Defensive Contest",
@@ -104,14 +113,13 @@ nba_contest_model <- lm(qSQ ~ contestLevel, data = shots)
 pander(nba_contest_model)
 ```
 
-The regression reveals a highly significant negative relationship between variables; that across teams, as contest level goes up (i.e uncontested to heavily contested), the probability that a shot goes in goes down. These results are expected since tougher defenses across the NBA will produce lower scoring opportunities for opponents.
+The regression reveals a significant, negative relationship between variables; that across teams, as contest level goes up (i.e uncontested to heavily contested), the probability that a shot goes in goes down. These results are expected since tougher defenses across the NBA will produce lower scoring opportunities for opponents.
 
-## Team-Level Analyses
+## Contributions to Our Success
 
-#### Shot Quality vs. Shot Success
+### Effective Offense
 
 ```{r shotsuccess, echo=FALSE}
-#include 3 pt attempts
 sqvss <-shots %>%
   group_by(team_nba_off) %>%
   summarise(avg_qSQ = mean(qSQ, na.rm = TRUE),
@@ -121,102 +129,20 @@ sqvss <-shots %>%
 kable(sqvss, col.names = c("Team", "Avg Shot Make Probability", "Actual FG Pct"))
 ```
 
-However, reference table XXXX reveals that Though we had nearly identical shot quality, the gap in actual field goal percentage could point to exceptional Bucks defense or cold shooting from OKC.
+At a very basic level, we can observe that under the same average shot difficulty, we put in more shots (42% efficiency compared to their 33%). The gap in actual field goal percentage could point to exceptional Bucks defense or cold shooting from OKC.
 
-\*\*\*\*\*relationship between shot prob and level of contest -- looking at expectations of the game from previous data.
-
-one of two stories - we forced them into making tough shots and shots fell for us the other story is that
-
-#### Defensive Contest
-
-```{r, echo=FALSE}
-dc <- shots %>%
-  group_by(contestLevel, team_nba_off) %>%
-  summarise(fg_pct = sum(fg)/sum(fga),
-            avg_qSQ = mean(qSQ, na.rm = TRUE),
-            attempts = n()) %>%
-  arrange(fg_pct)
-kable(dc, col.names = c("Contest Level", "Team", "FG Pct", "Avg Shot Make Prob", "Attempts"))
+```{r, echo=FALSE, include=FALSE}
+shots %>% 
+  filter(team_nba_off %in% c("MIL", "OKC")) %>%
+  ggplot(aes(x = complexShotType, fill = team_nba_off))+
+  geom_bar( position = 'dodge')+
+  scale_fill_manual(values=c("green", "blue"))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-##### Uncontested
+### Shot Distribution
 
-OKC took slightly more difficult uncontested shots and were more efficient from them, meaning our defense likely slacked off due to the perceived low probability that a shot would go in.
-
-##### Lightly Contested
-
-Avg shot `qSQ` difficulty was comparable however, we converted at a much higher rate! Our ability to convert lightly contested shots at a higher rate could indicate superior shot selection and offensive execution.
-
-OKC's low conversion on lightly contested shots point to a Bucks defense forcing OKC into shooting tougher shots. This is confirmed in scoring and shooting performance by player table \*\*
-
-##### Heavily Contested
-
-The average shot difficulty `qSQ` was similar for both teams, OKC was able to achieve slightly better shooting performance in the presence of heavy defense. This points to a high defensive caliber of both teams; us matching the tenacity of OKC, the NBA's regular season leader in defensive rating, with our own resilient defense.
-
-```{r, echo=FALSE}
-defense_summary <- shots %>%
-  group_by(team_nba_def) %>%
-  summarize(
-    opponent_fg_pct = mean(sum(fg)/sum(fga)),  # Averaging FGs when this team is defending
-    avg_qSQ_against = mean(qSQ, na.rm = TRUE), # Average shot quality faced by this team's defense
-    avg_contest_level = mean(as.numeric(factor(contestLevel)), na.rm = TRUE), # If contest level is ordered
-    attempts_faced = n(),    # Total attempts faced by the defense
-    .groups = 'drop'
-  )
-
-# Use kable to display the defense summary table
-kable(defense_summary, digits = 3, caption = "Defense Performance Summary by Team")
-```
-
-We held OKC to a much lower field goal percentage on many more attempts.
-
-#### Catch-and-shoot Effectiveness
-
-```{r, echo=FALSE}
-cse <- shots %>%
-  filter(catchAndShoot == 1) %>% 
-  group_by(team_nba_off) %>%
-  summarise(fg_pct = sum(fg)/sum(fga),
-            avg_qSQ = mean(qSQ, na.rm = TRUE),
-            attempts = n())
-kable(cse)
-```
-
-The similarity in average shot quality (MIL: 55.2, OKC: 55.4) indicates that both teams were generating similar quality of catch-and-shoot opportunities. This suggests that this disparity in FG% is not due to the types of shots taken, but rather the effectiveness of their execution and exceptional Bucks defense.
-
-The higher attempt rate also signifies MIL's ability to create more opportunities through effective ball movement and off-ball player movement. The game strategy focused on leveraging catch-and-shoot opportunities contributed to greater scoring.
-
-#### Court Region and Shot Type
-
-```{r, echo=FALSE}
-# crst <- shots%>%
-#   group_by(team_nba_off, region) %>%
-#   summarise(fg_pct = mean(fg, na.rm = TRUE),
-#             attempts = n()) %>%
-#   arrange(desc(fg_pct))
-# 
-# kable(crst)
-crst <- shots %>%
-  group_by(team_nba_off, region) %>%
-  summarise(
-    fg_pct = sum(fg)/sum(fga),
-    attempts = n(),
-    .groups = 'drop'  # Drop grouping to avoid implicit grouping layers
-  ) %>%
-  filter(fg_pct > 0) %>%  # Filter out rows where fg_pct is zero
-  arrange(desc(fg_pct))
-
-# Display the filtered results as a table
-kable(crst)
-```
-
-We were extremely effective from high-value zones, (e.i., Left wing three, Right corner three ,Restricted area (RA)
-
-In contrast, OKC underperformed in their strongholds:RA: 40%, Key: 45.8%, Middle two: 50% on just 6 shots
-
-This means we didn't just shoot better, we shot better from smarter, higher value areas.
-
-Heat Map
+#### Heat Map
 
 ```{r heat map, echo=FALSE}
 shots %>%
@@ -229,27 +155,112 @@ shots %>%
   theme_minimal()
 ```
 
-From the heat map and bar chart, we can draw that OKC had greater diversity in their shot selection; many more types of shots fell for them. However, we had noticeably higher catch and shoot makes and catch and shoot makes with a relocation, indicating that OKC has trouble defending a player when moving to a different spot to shoot from.
+```{r bar plot, echo=FALSE}
+shots %>% 
+  filter(team_nba_off %in% c("MIL", "OKC")) %>%
+  ggplot(aes(x = complexShotType, fill = team_nba_off))+
+  geom_bar( position = 'dodge')+
+  scale_fill_manual(values=c("forest green", "blue"))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+From the heat map and bar chart, we can draw that OKC had greater diversity in their shot selection. However, we had noticeably higher catch and shoot makes, catch and shoots with relocation, stand-still layups, and tips. Both charts display the Bucks' ability to convert on shots near the rim and in their most effective corners.
+
+#### Court Region and Shot Type
+
+This chart displays the top 5 most effective shooting regions for each team
+
+```{r, echo=FALSE}
+top5_shots <- shots %>%
+  group_by(team_nba_off, region) %>%
+  summarise(
+    fg_pct = sum(fg) / sum(fga),
+    attempts = n(),
+    .groups = 'drop'
+  ) %>%
+  filter(fg_pct > 0) %>%
+  group_by(team_nba_off) %>%
+  slice_max(fg_pct, n = 5) %>%
+  arrange(team_nba_off, desc(fg_pct)) 
+
+
+kable(top5_shots)
+```
+
+##### Bucks
+
+**We were extremely effective from high-value zones,** (e.i., Left wing three, Right corner three, Restricted area). Our perimeter shooting is notably strong: we shot **85.7% from the left wing three** (6 of 7), and **57.1% from the right corner three** (4 of 7). Shooting well over league average.
+
+##### OKC
+
+OKC's **left corner two** was notably less effective (33.3%, 2 of 6). Mid-range zones such as the **left wing two** and **middle two** each returned **50% FG**, though on low volume (3 and 6 attempts respectively).
+
+### Strong Defense
+
+To understand whether the Bucks' defensive strategy made an impact, I next examined shot contest levels.
+
+#### Defensive Contest
+
+```{r tab-summary, echo=FALSE}
+dc <- shots %>%
+  group_by(contestLevel, team_nba_off) %>%
+  summarise(fg_pct = sum(fg)/sum(fga),
+            avg_qSQ = mean(qSQ, na.rm = TRUE),
+            attempts = n()) %>%
+  arrange(contestLevel)
+kable(dc, col.names = c("Contest Level", "Team", "FG Pct", "Avg Shot Make Prob", "Attempts"))
+```
+
+##### Uncontested
+
+OKC took slightly more difficult uncontested shots and were more efficient from them, meaning our defense likely slacked off due to the perceived low probability that a shot would go in.
+
+##### Lightly Contested
+
+Avg shot `qSQ` difficulty was comparable however, we converted at a much higher rate! Our ability to convert lightly contested shots at a higher rate could indicate superior shot selection and offensive execution.
+
+OKC's low conversion on lightly contested shots point to a Bucks defense forcing OKC into shooting from tougher spots. This is confirmed in scoring and shooting performance by player table where we find starters like Shai with lower average`qSQ` or shot make probabilities.
+
+##### Heavily Contested
+
+The average shot difficulty `qSQ` was similar for both teams, OKC was able to achieve slightly better shooting performance in the presence of heavy defense. This points to a high defensive caliber of both teams; us matching the tenacity of OKC, the NBA's regular season leader in defensive rating, with our own resilient defense.
+
+```{r, echo=FALSE}
+defense_summary <- shots %>%
+  group_by(team_nba_def) %>%
+  summarize(
+    opponent_fg_pct = mean(sum(fg)/sum(fga)),  # Averaging FGs when this team is defending
+    avg_qSQ_against = mean(qSQ, na.rm = TRUE), # Average shot quality faced by this team's defense
+    avg_contest_level = mean(as.numeric(factor(contestLevel, levels = c("uncontested", "lightly_contested", "highly_contested"))), na.rm = TRUE),
+    attempts_faced = n(),    # Total attempts faced by the defense
+    .groups = 'drop'
+  )
+
+kable(defense_summary, digits = 3, caption = "Defense Performance Summary by Team")
+```
+
+With similar average shot quality and contest level---both of which were uncharacteristic based on regular season data---and a higher volume of shot attempts, the evidence suggests that OKC was simply *unlucky*. The Bucks seemingly made more shots than expected against OKC, even though they didn't take higher-quality or less-contested ones.
 
 #### Scoring and shooting performance by team
 
 ```{r, echo=FALSE}
-# Group by team and player, then calculate the metrics
+# Group by team and player, summarize shooting stats, then filter top 6 by FGA per team
 shooting_data <- shots %>%
   group_by(team_nba_off, player_nba_shooter) %>%
   summarize(
     FGA = sum(fga),
     FG = sum(fg),
-    FG_Percentage = mean(sum(fg)/sum(fga)),
+    FG_Percentage = FG / FGA,
     ThreePA = sum(fga3),
     ThreeP = sum(fg3),
-    ThreeP_Percentage = mean(sum(fg3) / sum(fga3), na.rm = TRUE),
+    ThreeP_Percentage = sum(fg3)/sum(fga3),
     Avg_Distance = mean(distance, na.rm = TRUE),
     Avg_qSQ = mean(qSQ, na.rm = TRUE)
   ) %>%
-  arrange(team_nba_off, desc(Avg_qSQ))
+  group_by(team_nba_off) %>%
+  slice_max(FGA, n = 8, with_ties = FALSE) %>%
+  arrange(team_nba_off, desc(FGA))
 
-# Display the results
 kable(shooting_data)
 ```
 
@@ -257,34 +268,134 @@ kable(shooting_data)
 
 Starters like Dame, Giannis and Brook maintained high `FG` and `ThreeP` percentages while steadily creating shots with low difficulty/ higher make probabilities.
 
-Forwards like [Taurean Prince]{.underline} creating shots with **higher make probabilities** and guards like Green and Trent Jr. shooting maintaining outstanding `ThreeP` efficientcies while creating shots with higher probabilities of makes, compared to starters like Dame, undoubtedly contributed to the team's success.
+Forwards like Prince creating shots with **higher make probabilities** and guards like Green and Trent Jr. shooting maintaining outstanding `ThreeP` efficiencies while creating shots with higher probabilities of makes, compared to starters like Dame, undoubtedly contributed to the team's success.
 
-This table outlines a successful game plan that aligned with player's strengths and set them up for success.
+This table's outcomes show a successful game plan that prioritized player's strengths and set them up for success.
+
+```{r Giannis, echo=FALSE}
+Giannis <- shots %>%
+  filter(player_nba_shooter == "Antetokounmpo, Giannis") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = sum(fg)/sum(fga),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    highly_contested_pct = mean(contestLevel == "heavily_contested")
+  )
+kable(Giannis, caption = "Giannis Antetokounmpo")
+```
+
+```{r Dame, echo=FALSE}
+Dame <- shots %>%
+  filter(player_nba_shooter == "Lillard, Damian") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = sum(fg)/sum(fga),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    highly_contested_pct = mean(contestLevel == "heavily_contested")
+  )
+kable(Dame, caption = "Damian Lillard")
+```
+
+```{r Brook, echo=FALSE}
+Brook <- shots %>%
+  filter(player_nba_shooter == "Lopez, Brook") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = sum(fg)/sum(fga),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    highly_contested_pct = mean(contestLevel == "heavily_contested")
+  )
+kable(Brook, caption = "Brook Lopez")
+```
 
 ##### OKC
 
-Starters like Shai took a larger number of improbable shots thus converting on only a third of his `FG` and an even lower percentage of `ThreeP`. Other starters with `qSQ` averages in the low 50's shot
+Starters like Shai took a larger number of improbable shots thus converting on only a third of his `FG` and an even lower percentage of `ThreeP`. Other starters like Jalen Williams suboptimaly averaged low make probability`qSQ`(avg = 45) likely hurting his field goal percentage.
 
-#### Assists and Passing by team
+```{r SGA, echo=FALSE}
+SGA <- shots %>%
+  filter(player_nba_shooter == "Gilgeous-Alexander, Shai") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = sum(fg)/sum(fga),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    highly_contested_pct = mean(contestLevel == "heavily_contested")
+  )
+kable(SGA, caption = "Shai Gilgeous-Alexander")
+```
+
+```{r Isaiah H., echo=FALSE}
+IH <- shots %>%
+  filter(player_nba_shooter == "Hartenstein, Isaiah") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = sum(fg)/sum(fga),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    highly_contested_pct = mean(contestLevel == "heavily_contested")
+  )
+kable(IH, caption = "Isaiah Hartenstein")
+```
+
+```{r JDub, echo=FALSE}
+JDub <- shots %>%
+  filter(player_nba_shooter == "Williams, Jalen") %>%
+  summarise(
+    attempts = n(),
+    fg_pct = sum(fg)/sum(fga),
+    avg_qSQ = mean(qSQ),
+    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
+    highly_contested_pct = mean(contestLevel == "heavily_contested")
+  )
+kable(JDub, caption = "Jalen Williams")
+```
+
+### Ball Movement
+
+#### Catch-and-shoot Effectiveness
 
 ```{r, echo=FALSE}
-# Group by team and player, then calculate the metrics
-assist_data <- shots %>%
+cse <- shots %>%
+  filter(catchAndShoot == 1) %>% 
   group_by(team_nba_off) %>%
+  summarise(fg_pct = sum(fg) / sum(fga),
+            avg_qSQ = mean(qSQ, na.rm = TRUE),
+            attempts = n())
+kable(cse)
+```
+
+The similarity in average shot quality (MIL: 55.2, OKC: 55.4) indicates that both teams were generating similar quality of catch-and-shoot opportunities. The higher attempt rate signifies an successful game plan that created more opportunities through effective ball movement and off-ball player movement. The game strategy focused on leveraging catch-and-shoot opportunities contributed to greater scoring.
+
+#### Assists and Passing
+
+```{r, echo=FALSE}
+
+assist_data <- shots %>%
+  group_by(player_nba_passer, team_nba_off) %>%
   summarize(
     Assist_Opps = sum(assistOpp),
-    Assisted_Shots = sum(assisted),
-    Assist_Avg = Assist_Opps/Assisted_Shots
+    Assisted_Shots = sum(assisted)
   ) %>%
-  arrange(team_nba_off, desc(Assist_Opps))
+  group_by(team_nba_off) %>%
+  slice_max(order_by = Assisted_Shots, n = 8, with_ties = FALSE) %>%
+  arrange(team_nba_off, desc(Assisted_Shots))
 
-# Display the results
-kable(assist_data)
+knitr::kable(assist_data)
 ```
+
+The assist data highlights contrasting offensive structures between us and OKC. For us, **Giannis** **clearly served as the offensive hub**, generating 19 assist opportunities, resulting in 10 assisted shots.
+
+**OKC's playmaking was more distributed**, with Jalen Williams, Shai Gilgeous-Alexander, and Isaiah Hartenstein each generating 7--8 assist opportunities, **though with fewer converted assists**. This spread suggests a **more balanced but less efficient** scheme in this matchup, contributing to their lower overall offensive efficiency.
+
+### Contribution Spread
 
 #### Shot Quality vs. Makes for starters and bench
 
-```{r, echo=FALSE}
+```{r combineddata, include=FALSE}
 #merging
 team_min$MIN <- as.numeric(team_min$MIN, units = "mins")
 team_min <- team_min %>%
@@ -297,7 +408,7 @@ combined_data <- shots %>%
   left_join(select(team_min, Player, Team, MIN, STATUS), by = c("player_nba_shooter" = "Player", "team_nba_off" = "Team")) %>%
   group_by(player_nba_shooter, team_nba_off, STATUS) %>%
   summarize(
-    Total_Points = sum(sum(fg)*2,sum(fg3)*3),  # Assuming 'fg' captures points from made shots. You might need actual points if available.
+    Total_Points = sum((fg - fg3) * 2 + fg3 * 3),  
     Attempts = sum(fga),
     Minutes_Played = first(MIN),  # Picking minutes from `team_min`
     PPM = Total_Points / Minutes_Played,  # Points per minute
@@ -305,13 +416,12 @@ combined_data <- shots %>%
   ) %>%
   ungroup() %>% 
   arrange(team_nba_off, desc(PPM))
+```
 
-# Display the summarized results
-knitr::kable(combined_data)
-
-# Visualization: Minutes Played vs Points per Minute
-ggplot(combined_data, aes(x = Minutes_Played, y = PPM, color = STATUS)) +
+```{r, echo=FALSE}
+plot_1 <- ggplot(combined_data, aes(x = Minutes_Played, y = PPM, color = STATUS)) +
   geom_point(size = 3) +
+  geom_text_repel(aes(label = player_nba_shooter), size = 3, max.overlaps = 10) +
   geom_smooth(method = 'lm', se = FALSE, color = 'gray') +
   facet_wrap(~ team_nba_off) +
   labs(
@@ -321,9 +431,9 @@ ggplot(combined_data, aes(x = Minutes_Played, y = PPM, color = STATUS)) +
   ) +
   theme_minimal()
 
-# Visualization: Minutes Played vs Field Goal Percentage
-ggplot(combined_data, aes(x = Minutes_Played, y = FG_Percentage, color = STATUS)) +
+plot_2 <-ggplot(combined_data, aes(x = Minutes_Played, y = FG_Percentage, color = STATUS)) +
   geom_point(size = 3) +
+  geom_text_repel(aes(label = player_nba_shooter), size = 3, max.overlaps = 10) +
   geom_smooth(method = 'lm', se = FALSE, color = 'gray') +
   facet_wrap(~ team_nba_off) +
   labs(
@@ -332,112 +442,32 @@ ggplot(combined_data, aes(x = Minutes_Played, y = FG_Percentage, color = STATUS)
     y = "Field Goal Percentage"
   ) +
   theme_minimal()
-```
-
-Plots
-
-```{r, echo=FALSE, include=FALSE}
-ggplot(shots, aes(x = loc_x, y = loc_y, color = factor(fg))) +
-  geom_point(alpha = 0.7, size = 2) +
-  coord_fixed() +
-  facet_wrap(~team_nba_off) +
-  scale_color_manual(values = c("0" = "red", "1" = "green"), labels = c("Miss", "Make")) +
-  labs(title = "Shot Chart by Team", x = "Court X", y = "Court Y", color = "Shot Result") +
-  theme_minimal()
-```
-
-```{r, echo=FALSE, include=FALSE}
-draw_half_court() +
-  geom_point(data = shots, aes(x = loc_x, y = loc_y, color = factor(fg)),
-             size = 2, alpha = 0.7) +
-  scale_color_manual(values = c("0" = "red", "1" = "green")) +
-  labs(title = "Shot Map with Court Overlay", color = "Shot Made")
 
 ```
 
-```{r, echo=FALSE}
-#size shot prob
-#color is contest 
-shots %>% 
-  filter(team_nba_off %in% c("MIL")) %>%
-  ggplot(aes(x = loc_x, y = loc_y)) +
-  geom_point(aes(color = factor(fg)), size = 2, alpha = 0.7) +
-  scale_color_manual(values = c("0" = "red", "1" = "green")) +
-  labs(title = "Bucks Shots", color = "Shot Made") +
-  draw_half_court_layers()
+```{r side-by-side-plots, fig.width=14, fig.height=6, echo=FALSE, out.width='100%'}
 
+(plot_1 | plot_2) + plot_layout(widths = c(1, 1))  # Ensure equal widths
 ```
 
-```{r, echo=FALSE}
-shots %>% 
-  filter(team_nba_off %in% c("OKC")) %>%
-  ggplot(aes(x = loc_x, y = loc_y)) +
-  geom_point(aes(color = factor(fg)), size = 2, alpha = 0.7) +
-  scale_color_manual(values = c("0" = "red", "1" = "green")) +
-  labs(title = "OKC Shots", color = "Shot Made") +
-  draw_half_court_layers()
-```
+Kenrich Williams, Ajay Mitchell, and Alex Caruso combined for 2 made field goals on 14 total attempts. With these role players underperforming, it reinforces the notion that OKC's offensive inefficiency in the game was more about underperformance.
 
-```{r, echo=FALSE}
-shots %>% 
-  filter(team_nba_off %in% c("MIL", "OKC")) %>%
-  ggplot(aes(x = complexShotType, fill = team_nba_off))+
-  geom_bar( position = 'dodge')+
-  scale_fill_manual(values=c("green", "blue"))+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
+In the midst of OKC's suboptimal performance, we had **a bench who stepped up**. Players like Gary Trent Jr. and AJ Green outperformed most starters when accounting for the amount of minutes played.
 
-```{r, include=FALSE}
-# shots %>% 
-#   filter(team_nba_off %in% c("OKC")) %>%
-#   ggplot(aes(x = complexShotType))+
-#   geom_bar()+
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
+## Key Takeaways
 
-```{r, echo=FALSE}
-shots %>%
-  filter(player_nba_shooter == "Gilgeous-Alexander, Shai") %>%
-  summarise(
-    attempts = n(),
-    fg_pct = mean(fg),
-    avg_qSQ = mean(qSQ),
-    catch_shoot_pct = mean(fg[catchAndShoot == 1]),
-    contested_pct = mean(contestLevel == "heavily_contested")
-  )
-```
+There are several factors that contributed to our NBA Cup Finals win. OKC is a team with a stacked roster of talent, favored highly on both offensive and defensive ends. Intuitively, there must be a *give and take* that allowed us to prevail given the circumstances. Here's what that looks like:
 
-Individuals
+1.  [Underperformance From OKC Starters]{.underline} - OKC's primary scorers Shai Gilgeous-Alexander and Jalen Williams combined for **44 FGA but converted just 16**, yielding a collective **FG% of \~36%**, well below regular season efficiency. Despite averaging decent quality shots (e.g., Shai's qSQ = 49.0), their actual shooting fell short of expectation. This underperformance, especially given the volume, significantly limited OKC's offensive output. Additionally, Isaiah Joe and Lu Dort, typically relied on for perimeter shooting, went **1-for-10 from three**, despite solid average shot quality (qSQ \> 50). These figures underscore not just tough shooting luck, but a failure to capitalize on decent opportunities.
 
-Assists and Passing
+2.  [Sticking to Our Strengths]{.underline} - The Bucks benefitted from multiple contributors shooting well within their historical strengths. Brook Lopez and Damian Lillard each **shot 50% from three**. Notably, bench players like Gary Trent Jr. and Andre Jackson Jr. took shots with comparable or even *better* expected shot quality than some starters . This suggests **our game plan generated good looks for everyone.**
 
-```{r, echo=FALSE}
+    Importantly, our bench did not take significantly lower-quality shots. Players like Andre Jackson Jr., Taurean Prince, and AJ Green had some of the **highest average shot quality** (e.g., Jackson Jr. at 60.6 qSQ, Prince at 60.4), and Green even shot 60% from the field. This suggests that our offensive distribution created good looks regardless of who was taking them.
 
-assist_data <- shots %>%
-  group_by(player_nba_passer, team_nba_off) %>%
-  summarize(
-    Assist_Opps = sum(assistOpp),
-    Assisted_Shots = sum(assisted)
-  )
+3.  [Reliable Defense]{.underline} - Defense was instrumental in our victory. **We forced OKC to take tougher shots**. We maintained a consistent defensive effort, effectively contesting shots without sacrificing shot efficiency. The defensive contest levels revealed that while OKC had slightly better shooting performance on uncontested shots, **we grossly outperformed OKC in lightly contested shots**. Additionally, in heavily contested scenarios, both teams displayed similar defensive intensity, but the Bucks were able to limit OKC's high-quality scoring opportunities, contributing to their success.
 
-knitr::kable(assist_data)
-```
+4.  [Unfamiliarity]{.underline} - It's important to note that **the NBA Cup Final marked the first meeting between the Bucks and the Thunder this season**. Without prior head-to-head context, both teams entered the matchup without acquaintance or familiarity with each other's tendencies. This lack of previous exposure may have **amplified the role of variance in shooting outcomes and defensive matchups**.
 
-Individual Defense
+5.  [Randomness]{.underline} - League-wide probabilities explain that there is a strong **negative** relationship between contest level and make probability; **with tougher defensive efforts, make probability should go down**. This was not the story for OKC's offense. The Bucks grossly outperformed OKC on lightly contested shots. Nearly a third of OKC's shot attempts where lightly contested yet converted only 18% of the time compared to our 52% for lightly contested. As such, the outcome of the game may reflect more randomness than entrenched competitive advantages.
 
-```{r, echo=FALSE}
-# Defensive contributions
-defense_data <- shots %>%
-  group_by(player_nba_closestDef, team_nba_def) %>%
-  summarize(
-    Blocks = sum(blocked),
-    Avg_Contest_Level = mean(as.numeric(factor(contestLevel)), na.rm = TRUE)
-  ) %>% 
-  arrange(team_nba_def, desc(Avg_Contest_Level))
-
-knitr::kable(defense_data)
-```
-
-Conclusions
-
-We seemed to have optimized our help-defense and closeout structure: Maintaining high contest frequency without sacrificing defensive integrity. This implies a high-IQ rotation scheme and strong communication.
+The NBA cup final marked a career performance for many Bucks players in the face of a suboptimal opponent performance. The well thought-out game plan that played to the strengths of each player and also forced opponents to play uncharacteristically contributed to our success in the NBA Cup Final.
