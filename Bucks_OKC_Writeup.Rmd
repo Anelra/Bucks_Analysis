@@ -86,6 +86,18 @@ The NBA Cup is a recent addition to regular season play with a tournament debut 
 
 The Bucks' 2024 NBA Cup championship game was played against a team who, in regular season, had the highest offensive and defensive rating in the NBA (compared to our no.11). OKC is a statistically sound team with superstars and MVP nominees like Shai Gilgeous-Alexander accompanied by a deep roster of heavy contributors. During there first match-up of the year, without doubt, the OKC Thunder were expected to walk away with a trophy. What circumstances fostered the Bucks' success in the NBA Cup finals?
 
+This report addresses the five major findings from this game's data that led to our success:
+
+1.  [Sticking to Our Strengths](#strengths)
+
+2.  [Reliable Defense](#defense)
+
+3.  [Randomness](#randomness)
+
+4.  [Opponent Underperformance](#OU)
+
+5.  [Unfamiliarity](#unfamiliarity)
+
 ```{r import data, include=FALSE}
 shots <- read_csv("data_mil_okc_121724_shots(in).csv")
 team_min <- read_csv("NBA_Cup_Minutes_Played - Sheet1.csv")
@@ -117,7 +129,7 @@ The regression reveals a significant, negative relationship between variables; t
 
 ## Contributions to Our Success
 
-### Effective Offense
+### Sticking to Our Strengths {#strengths}
 
 ```{r shotsuccess, echo=FALSE}
 sqvss <-shots %>%
@@ -195,7 +207,7 @@ kable(top5_shots)
 
 OKC's **left corner two** was notably less effective (33.3%, 2 of 6). Mid-range zones such as the **left wing two** and **middle two** each returned **50% FG**, though on low volume (3 and 6 attempts respectively).
 
-### Strong Defense
+### Reliable Defense {#defense}
 
 To understand whether the Bucks' defensive strategy made an impact, I next examined shot contest levels.
 
@@ -225,6 +237,8 @@ OKC's low conversion on lightly contested shots point to a Bucks defense forcing
 
 The average shot difficulty `qSQ` was similar for both teams, OKC was able to achieve slightly better shooting performance in the presence of heavy defense. This points to a high defensive caliber of both teams; us matching the tenacity of OKC, the NBA's regular season leader in defensive rating, with our own resilient defense.
 
+### Randomness {#randomness}
+
 ```{r, echo=FALSE}
 defense_summary <- shots %>%
   group_by(team_nba_def) %>%
@@ -240,6 +254,43 @@ kable(defense_summary, digits = 3, caption = "Defense Performance Summary by Tea
 ```
 
 With similar average shot quality and contest level---both of which were uncharacteristic based on regular season data---and a higher volume of shot attempts, the evidence suggests that OKC was simply *unlucky*. The Bucks seemingly made more shots than expected against OKC, even though they didn't take higher-quality or less-contested ones.
+
+#### Catch-and-shoot Effectiveness
+
+```{r, echo=FALSE}
+cse <- shots %>%
+  filter(catchAndShoot == 1) %>% 
+  group_by(team_nba_off) %>%
+  summarise(fg_pct = sum(fg) / sum(fga),
+            avg_qSQ = mean(qSQ, na.rm = TRUE),
+            attempts = n())
+kable(cse)
+```
+
+The similarity in average shot quality (MIL: 55.2, OKC: 55.4) indicates that both teams were generating similar quality of catch-and-shoot opportunities. The higher attempt rate signifies an successful game plan that created more opportunities through effective ball movement and off-ball player movement. The game strategy focused on leveraging catch-and-shoot opportunities contributed to greater scoring.
+
+#### Assists and Passing
+
+```{r, echo=FALSE}
+
+assist_data <- shots %>%
+  group_by(player_nba_passer, team_nba_off) %>%
+  summarize(
+    Assist_Opps = sum(assistOpp),
+    Assisted_Shots = sum(assisted)
+  ) %>%
+  group_by(team_nba_off) %>%
+  slice_max(order_by = Assisted_Shots, n = 8, with_ties = FALSE) %>%
+  arrange(team_nba_off, desc(Assisted_Shots))
+
+knitr::kable(assist_data)
+```
+
+The assist data highlights contrasting offensive structures between us and OKC. For us, **Giannis** **clearly served as the offensive hub**, generating 19 assist opportunities, resulting in 10 assisted shots.
+
+**OKC's playmaking was more distributed**, with Jalen Williams, Shai Gilgeous-Alexander, and Isaiah Hartenstein each generating 7--8 assist opportunities, **though with fewer converted assists**. This spread suggests a **more balanced but less efficient** scheme in this matchup, contributing to their lower overall offensive efficiency.
+
+### Opponent Underperformance {#OU}
 
 #### Scoring and shooting performance by team
 
@@ -354,45 +405,6 @@ JDub <- shots %>%
 kable(JDub, caption = "Jalen Williams")
 ```
 
-### Ball Movement
-
-#### Catch-and-shoot Effectiveness
-
-```{r, echo=FALSE}
-cse <- shots %>%
-  filter(catchAndShoot == 1) %>% 
-  group_by(team_nba_off) %>%
-  summarise(fg_pct = sum(fg) / sum(fga),
-            avg_qSQ = mean(qSQ, na.rm = TRUE),
-            attempts = n())
-kable(cse)
-```
-
-The similarity in average shot quality (MIL: 55.2, OKC: 55.4) indicates that both teams were generating similar quality of catch-and-shoot opportunities. The higher attempt rate signifies an successful game plan that created more opportunities through effective ball movement and off-ball player movement. The game strategy focused on leveraging catch-and-shoot opportunities contributed to greater scoring.
-
-#### Assists and Passing
-
-```{r, echo=FALSE}
-
-assist_data <- shots %>%
-  group_by(player_nba_passer, team_nba_off) %>%
-  summarize(
-    Assist_Opps = sum(assistOpp),
-    Assisted_Shots = sum(assisted)
-  ) %>%
-  group_by(team_nba_off) %>%
-  slice_max(order_by = Assisted_Shots, n = 8, with_ties = FALSE) %>%
-  arrange(team_nba_off, desc(Assisted_Shots))
-
-knitr::kable(assist_data)
-```
-
-The assist data highlights contrasting offensive structures between us and OKC. For us, **Giannis** **clearly served as the offensive hub**, generating 19 assist opportunities, resulting in 10 assisted shots.
-
-**OKC's playmaking was more distributed**, with Jalen Williams, Shai Gilgeous-Alexander, and Isaiah Hartenstein each generating 7--8 assist opportunities, **though with fewer converted assists**. This spread suggests a **more balanced but less efficient** scheme in this matchup, contributing to their lower overall offensive efficiency.
-
-### Contribution Spread
-
 #### Shot Quality vs. Makes for starters and bench
 
 ```{r combineddata, include=FALSE}
@@ -452,22 +464,22 @@ plot_2 <-ggplot(combined_data, aes(x = Minutes_Played, y = FG_Percentage, color 
 
 Kenrich Williams, Ajay Mitchell, and Alex Caruso combined for 2 made field goals on 14 total attempts. With these role players underperforming, it reinforces the notion that OKC's offensive inefficiency in the game was more about underperformance.
 
-In the midst of OKC's suboptimal performance, we had **a bench who stepped up**. Players like Gary Trent Jr. and AJ Green outperformed most starters when accounting for the amount of minutes played.
+In the midst of OKC's sub-optimal performance, we had **a bench who stepped up**. Players like Gary Trent Jr. and AJ Green outperformed most starters when accounting for the amount of minutes played.
 
 ## Key Takeaways
 
 There are several factors that contributed to our NBA Cup Finals win. OKC is a team with a stacked roster of talent, favored highly on both offensive and defensive ends. Intuitively, there must be a *give and take* that allowed us to prevail given the circumstances. Here's what that looks like:
 
-1.  [Underperformance From OKC Starters]{.underline} - OKC's primary scorers Shai Gilgeous-Alexander and Jalen Williams combined for **44 FGA but converted just 16**, yielding a collective **FG% of \~36%**, well below regular season efficiency. Despite averaging decent quality shots (e.g., Shai's qSQ = 49.0), their actual shooting fell short of expectation. This underperformance, especially given the volume, significantly limited OKC's offensive output. Additionally, Isaiah Joe and Lu Dort, typically relied on for perimeter shooting, went **1-for-10 from three**, despite solid average shot quality (qSQ \> 50). These figures underscore not just tough shooting luck, but a failure to capitalize on decent opportunities.
-
-2.  [Sticking to Our Strengths]{.underline} - The Bucks benefitted from multiple contributors shooting well within their historical strengths. Brook Lopez and Damian Lillard each **shot 50% from three**. Notably, bench players like Gary Trent Jr. and Andre Jackson Jr. took shots with comparable or even *better* expected shot quality than some starters . This suggests **our game plan generated good looks for everyone.**
+1.  [Sticking to Our Strengths]{.underline} - The Bucks benefitted from multiple contributors shooting well within their historical strengths. Brook Lopez and Damian Lillard each **shot 50% from three**. Notably, bench players like Gary Trent Jr. and Andre Jackson Jr. took shots with comparable or even *better* expected shot quality than some starters . This suggests **our game plan generated good looks for everyone.**
 
     Importantly, our bench did not take significantly lower-quality shots. Players like Andre Jackson Jr., Taurean Prince, and AJ Green had some of the **highest average shot quality** (e.g., Jackson Jr. at 60.6 qSQ, Prince at 60.4), and Green even shot 60% from the field. This suggests that our offensive distribution created good looks regardless of who was taking them.
 
-3.  [Reliable Defense]{.underline} - Defense was instrumental in our victory. **We forced OKC to take tougher shots**. We maintained a consistent defensive effort, effectively contesting shots without sacrificing shot efficiency. The defensive contest levels revealed that while OKC had slightly better shooting performance on uncontested shots, **we grossly outperformed OKC in lightly contested shots**. Additionally, in heavily contested scenarios, both teams displayed similar defensive intensity, but the Bucks were able to limit OKC's high-quality scoring opportunities, contributing to their success.
+2.  [Reliable Defense]{.underline} - Defense was instrumental in our victory. **We forced OKC to take tougher shots**. We maintained a consistent defensive effort, effectively contesting shots without sacrificing shot efficiency. The defensive contest levels revealed that while OKC had slightly better shooting performance on uncontested shots, **we grossly outperformed OKC in lightly contested shots**. Additionally, in heavily contested scenarios, both teams displayed similar defensive intensity, but the Bucks were able to limit OKC's high-quality scoring opportunities, contributing to their success.
 
-4.  [Unfamiliarity]{.underline} - It's important to note that **the NBA Cup Final marked the first meeting between the Bucks and the Thunder this season**. Without prior head-to-head context, both teams entered the matchup without acquaintance or familiarity with each other's tendencies. This lack of previous exposure may have **amplified the role of variance in shooting outcomes and defensive matchups**.
+3.  [Randomness]{.underline} - League-wide probabilities explain that there is a strong **negative** relationship between contest level and make probability; **with tougher defensive efforts, make probability should go down**. This was not the story for OKC's offense. The Bucks grossly outperformed OKC on lightly contested shots. Nearly a third of OKC's shot attempts where lightly contested yet converted only 18% of the time compared to our 52% for lightly contested. As such, the outcome of the game may reflect more randomness than entrenched competitive advantages.
 
-5.  [Randomness]{.underline} - League-wide probabilities explain that there is a strong **negative** relationship between contest level and make probability; **with tougher defensive efforts, make probability should go down**. This was not the story for OKC's offense. The Bucks grossly outperformed OKC on lightly contested shots. Nearly a third of OKC's shot attempts where lightly contested yet converted only 18% of the time compared to our 52% for lightly contested. As such, the outcome of the game may reflect more randomness than entrenched competitive advantages.
+4.  [Opponent Underperformance]{.underline} - OKC's primary scorers Shai Gilgeous-Alexander and Jalen Williams combined for **44 FGA but converted just 16**, yielding a collective **FG% of \~36%**, well below regular season efficiency. Despite averaging decent quality shots (e.g., Shai's qSQ = 49.0), their actual shooting fell short of expectation. This underperformance, especially given the volume, significantly limited OKC's offensive output. Additionally, Isaiah Joe and Lu Dort, typically relied on for perimeter shooting, went **1-for-10 from three**, despite solid average shot quality (qSQ \> 50). These figures underscore not just tough shooting luck, but a failure to capitalize on decent opportunities.
 
-The NBA cup final marked a career performance for many Bucks players in the face of a suboptimal opponent performance. The well thought-out game plan that played to the strengths of each player and also forced opponents to play uncharacteristically contributed to our success in the NBA Cup Final.
+5.  [Unfamiliarity]{.underline}{#unfamiliarity} - Finally, t's important to note that **the NBA Cup Final marked the first meeting between the Bucks and the Thunder this season**. Without prior head-to-head context, both teams entered the matchup without acquaintance or familiarity with each other's tendencies. This lack of previous exposure may have **amplified the role of variance in shooting outcomes and defensive matchups**.
+
+The NBA cup final marked a career performance for many Bucks players in the face of a sub-optimal opponent performance. The well thought-out game plan that played to the strengths of each player and also forced opponents to play uncharacteristically contributed to our success in the NBA Cup Final.
